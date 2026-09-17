@@ -17,4 +17,7 @@ AUTHORIZED_ADMINS = [
 
 SUPER_USER_EMAIL = "support@apexingoodcompany.co.uk"
 
+# Asset defaults
+DEFAULT_ASSET_LOCATION = os.getenv("DEFAULT_ASSET_LOCATION", "APEX HUB")
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./assets.db")
