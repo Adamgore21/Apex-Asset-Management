@@ -5,15 +5,16 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-apex-
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 
+# User inactivity policy
+INACTIVITY_AUTO_DISABLE_ENABLED = os.getenv("INACTIVITY_AUTO_DISABLE_ENABLED", "true").lower() == "true"
+INACTIVITY_DISABLE_DAYS = int(os.getenv("INACTIVITY_DISABLE_DAYS", "30"))
+
 AUTHORIZED_ADMINS = [
     "support@apexingoodcompany.co.uk",
     "business@apexingoodcompany.co.uk",
     "adam@apexingoodcompany.co.uk",
-    # Add more admin emails here:
-    # "admin@apexingoodcompany.co.uk",
-    # "manager@apexingoodcompany.co.uk",
 ]
 
-SUPER_USER_EMAIL = "support@apexingoodcompany.co.uk"  # Only this user can view audit logs
+SUPER_USER_EMAIL = "support@apexingoodcompany.co.uk"
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./assets.db")
