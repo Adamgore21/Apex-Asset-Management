@@ -37,17 +37,14 @@ class AssetType(str, enum.Enum):
 
 class Category(Base):
     __tablename__ = "categories"
-    
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     description = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     assets = relationship("Asset", back_populates="category")
 
 class Employee(Base):
     __tablename__ = "employees"
-    
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
@@ -59,15 +56,13 @@ class Employee(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     assets = relationship("Asset", back_populates="assigned_employee")
     handovers = relationship("AssetHandover", back_populates="employee")
 
 class Asset(Base):
     __tablename__ = "assets"
-    
     id = Column(Integer, primary_key=True, index=True)
-    asset_id = Column(String, unique=True, index=True)  # APX-IT-0001
+    asset_id = Column(String, unique=True, index=True)
     name = Column(String, index=True)
     description = Column(String)
     category_id = Column(Integer, ForeignKey("categories.id"))
@@ -83,10 +78,9 @@ class Asset(Base):
     assigned_employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     status = Column(String, default="available")
     notes = Column(Text)
-    photos = Column(String)  # JSON array of photo URLs
+    photos = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     category = relationship("Category", back_populates="assets")
     assigned_employee = relationship("Employee", back_populates="assets")
     it_specs = relationship("ITEquipmentSpec", back_populates="asset", uselist=False)
@@ -96,7 +90,6 @@ class Asset(Base):
 
 class ITEquipmentSpec(Base):
     __tablename__ = "it_equipment_specs"
-    
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), unique=True)
     cpu = Column(String, nullable=True)
@@ -107,15 +100,13 @@ class ITEquipmentSpec(Base):
     hostname = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
     mac_address = Column(String, nullable=True)
-    device_id = Column(String, nullable=True)  # Entra device ID
+    device_id = Column(String, nullable=True)
     intune_status = Column(String, nullable=True)
     last_check_in = Column(DateTime, nullable=True)
-    
     asset = relationship("Asset", back_populates="it_specs")
 
 class VehicleSpec(Base):
     __tablename__ = "vehicle_specs"
-    
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), unique=True)
     registration = Column(String, unique=True, index=True)
@@ -127,12 +118,10 @@ class VehicleSpec(Base):
     assigned_driver_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     lease_info = Column(Text, nullable=True)
     finance_info = Column(Text, nullable=True)
-    
     asset = relationship("Asset", back_populates="vehicle_specs")
 
 class AssetHandover(Base):
     __tablename__ = "asset_handovers"
-    
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"))
     employee_id = Column(Integer, ForeignKey("employees.id"))
@@ -142,15 +131,13 @@ class AssetHandover(Base):
     accessories = Column(Text)
     notes = Column(Text)
     signature_confirmed = Column(Boolean, default=False)
-    photos = Column(String)  # JSON array
+    photos = Column(String)
     is_active = Column(Boolean, default=True)
-    
     asset = relationship("Asset", back_populates="handovers")
     employee = relationship("Employee", back_populates="handovers")
 
 class MaintenanceRecord(Base):
     __tablename__ = "maintenance_records"
-    
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("assets.id"))
     issue_description = Column(Text)
@@ -164,8 +151,7 @@ class MaintenanceRecord(Base):
     resolution = Column(Text)
     warranty_repair = Column(Boolean, default=False)
     downtime_days = Column(Integer, nullable=True)
-    status = Column(String, default="open")  # open, in_progress, completed, cancelled
-    
+    status = Column(String, default="open")
     asset = relationship("Asset", back_populates="maintenance_records")
 
 class UserRole(str, enum.Enum):
@@ -176,11 +162,10 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     password_hash = Column(String, nullable=True)
-    role = Column(String, default="admin")  # super_admin, admin, manager, viewer
+    role = Column(String, default="admin")
     can_view_dashboard = Column(Boolean, default=True)
     can_manage_assets = Column(Boolean, default=True)
     can_manage_employees = Column(Boolean, default=True)
@@ -189,25 +174,26 @@ class User(Base):
     can_view_audit_logs = Column(Boolean, default=False)
     can_manage_users = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime, nullable=True)
+    disabled_at = Column(DateTime, nullable=True)
+    disabled_reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Invite(Base):
     __tablename__ = "invites"
-    
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
-    token = Column(String, unique=True, index=True)  # Unique invite token
-    role = Column(String, default="admin")  # Role they'll get when accepting
-    invited_by = Column(String)  # Email of admin who invited
+    token = Column(String, unique=True, index=True)
+    role = Column(String, default="admin")
+    invited_by = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime)  # Invite expiration (7 days)
-    accepted_at = Column(DateTime, nullable=True)  # When they accepted
-    is_used = Column(Boolean, default=False)  # Whether they've accepted
+    expires_at = Column(DateTime)
+    accepted_at = Column(DateTime, nullable=True)
+    is_used = Column(Boolean, default=False)
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
-    
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, index=True)
     action = Column(String, index=True)
