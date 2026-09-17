@@ -8,6 +8,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 AUTHORIZED_ADMINS = [
     "support@apexingoodcompany.co.uk",
     "business@apexingoodcompany.co.uk",
+    "adam@apexingoodcompany.co.uk",
     # Add more admin emails here:
     # "admin@apexingoodcompany.co.uk",
     # "manager@apexingoodcompany.co.uk",
