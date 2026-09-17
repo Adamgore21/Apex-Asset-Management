@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from datetime import datetime, date
 from typing import Optional, List
 
-# Categories
 class CategoryCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -12,11 +11,9 @@ class CategoryResponse(BaseModel):
     name: str
     description: Optional[str]
     created_at: datetime
-    
     class Config:
         from_attributes = True
 
-# Employees
 class EmployeeCreate(BaseModel):
     name: str
     email: str
@@ -44,11 +41,9 @@ class EmployeeResponse(BaseModel):
     end_date: Optional[date]
     is_active: bool
     created_at: datetime
-    
     class Config:
         from_attributes = True
 
-# IT Equipment Specs
 class ITEquipmentSpecCreate(BaseModel):
     cpu: Optional[str] = None
     ram_gb: Optional[int] = None
@@ -75,11 +70,9 @@ class ITEquipmentSpecResponse(BaseModel):
     device_id: Optional[str]
     intune_status: Optional[str]
     last_check_in: Optional[datetime]
-    
     class Config:
         from_attributes = True
 
-# Assets
 class AssetCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -92,7 +85,7 @@ class AssetCreate(BaseModel):
     current_value: float
     warranty_expiry: Optional[date] = None
     condition: str = "good"
-    location: str
+    location: str = "APEX HUB"
     assigned_employee_id: Optional[int] = None
     status: str = "available"
     notes: Optional[str] = None
@@ -128,11 +121,9 @@ class AssetResponse(BaseModel):
     notes: Optional[str]
     created_at: datetime
     updated_at: datetime
-    
     class Config:
         from_attributes = True
 
-# Handovers
 class AssetHandoverCreate(BaseModel):
     asset_id: int
     employee_id: int
@@ -155,11 +146,9 @@ class AssetHandoverResponse(BaseModel):
     notes: Optional[str]
     signature_confirmed: bool
     is_active: bool
-    
     class Config:
         from_attributes = True
 
-# Maintenance
 class MaintenanceRecordCreate(BaseModel):
     asset_id: int
     issue_description: str
@@ -191,11 +180,9 @@ class MaintenanceRecordResponse(BaseModel):
     warranty_repair: bool
     downtime_days: Optional[int]
     status: str
-    
     class Config:
         from_attributes = True
 
-# Dashboard Stats
 class DashboardStats(BaseModel):
     total_assets: int
     total_asset_value: float
@@ -206,7 +193,6 @@ class DashboardStats(BaseModel):
     assets_missing: int
     recent_activities: List[dict]
 
-# Invites
 class InviteCreate(BaseModel):
     email: str
     role: str = "admin"
@@ -235,11 +221,9 @@ class InviteResponse(BaseModel):
     created_at: datetime
     expires_at: datetime
     is_used: bool
-    
     class Config:
         from_attributes = True
 
-# Users
 class UserCreate(BaseModel):
     email: str
     role: str = "admin"
@@ -267,12 +251,13 @@ class UserResponse(BaseModel):
     can_view_audit_logs: bool
     can_manage_users: bool
     is_active: bool
+    last_login: Optional[datetime]
+    disabled_at: Optional[datetime]
+    disabled_reason: Optional[str]
     created_at: datetime
-    
     class Config:
         from_attributes = True
 
-# Audit Log
 class AuditLogResponse(BaseModel):
     id: int
     email: str
@@ -282,6 +267,5 @@ class AuditLogResponse(BaseModel):
     resource_name: str
     details: str
     created_at: datetime
-    
     class Config:
         from_attributes = True
