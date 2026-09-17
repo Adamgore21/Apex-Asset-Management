@@ -19,20 +19,17 @@ def run_schema_migrations():
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
-    if "users" not in tables:
-        return
-
-    columns = {column["name"] for column in inspector.get_columns("users")}
-    additions = {
-        "last_login": "DATETIME",
-        "disabled_at": "DATETIME",
-        "disabled_reason": "VARCHAR(255)",
-    }
-
     with engine.begin() as connection:
-        for column_name, column_type in additions.items():
-            if column_name not in columns:
-                connection.execute(text(f"ALTER TABLE users ADD COLUMN {column_name} {column_type}"))
+        if "users" in tables:
+            columns = {column["name"] for column in inspector.get_columns("users")}
+            additions = {
+                "last_login": "DATETIME",
+                "disabled_at": "DATETIME",
+                "disabled_reason": "VARCHAR(255)",
+            }
+            for column_name, column_type in additions.items():
+                if column_name not in columns:
+                    connection.execute(text(f"ALTER TABLE users ADD COLUMN {column_name} {column_type}"))
 
         if "assets" in tables:
             asset_columns = {column["name"] for column in inspector.get_columns("assets")}
@@ -41,6 +38,17 @@ def run_schema_migrations():
                     text("UPDATE assets SET location = 'APEX HUB' WHERE location IS NULL OR TRIM(location) = ''")
                 )
 
+                # Make APEX HUB the fallback for forms/integrations that submit a blank location.
+                if engine.dialect.name == "sqlite":
+                    connection.execute(text("""
+                        CREATE TRIGGER IF NOT EXISTS assets_default_location
+                        AFTER INSERT ON assets
+                        WHEN NEW.location IS NULL OR TRIM(NEW.location) = ''
+                        BEGIN
+                            UPDATE assets SET location = 'APEX HUB' WHERE id = NEW.id;
+                        END;
+                    """))
 
-# Run before application startup so existing SQLite databases receive the new columns.
+
+# Run before application startup so existing databases receive the new columns/defaults.
 run_schema_migrations()
