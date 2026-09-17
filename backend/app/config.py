@@ -19,8 +19,12 @@ class AuthorizedAdminList(list):
         configured = {str(item).strip().lower() for item in self}
 
         try:
-            from .database import SessionLocal
+            from .database import SessionLocal, run_schema_migrations
             from .models import User
+
+            # The application creates tables after importing its modules. Re-run the
+            # small migration here so fresh databases also get the SQLite trigger.
+            run_schema_migrations()
 
             db = SessionLocal()
             try:
