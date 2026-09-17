@@ -34,10 +34,13 @@ def run_schema_migrations():
             if column_name not in columns:
                 connection.execute(text(f"ALTER TABLE users ADD COLUMN {column_name} {column_type}"))
 
-        # Existing assets without a meaningful location are moved to the central APEX HUB location.
         if "assets" in tables:
             asset_columns = {column["name"] for column in inspector.get_columns("assets")}
             if "location" in asset_columns:
                 connection.execute(
                     text("UPDATE assets SET location = 'APEX HUB' WHERE location IS NULL OR TRIM(location) = ''")
                 )
+
+
+# Run before application startup so existing SQLite databases receive the new columns.
+run_schema_migrations()
