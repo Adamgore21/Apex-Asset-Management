@@ -22,7 +22,7 @@ function LoginPage({ onLoginSuccess, apiUrl }) {
         onLoginSuccess(response.data.access_token, response.data.email);
       }, 1000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please use an authorized email address.');
+      setError(err.response?.data?.detail || 'Login failed. Please check your details or contact an administrator.');
     }
     setLoading(false);
   };
@@ -100,7 +100,7 @@ function LoginPage({ onLoginSuccess, apiUrl }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="adam@apexingoodcompany.co.uk"
+              placeholder="Enter your email address"
               required
               style={{
                 width: '100%',
@@ -168,13 +168,10 @@ function LoginPage({ onLoginSuccess, apiUrl }) {
           paddingTop: '1.5rem',
           borderTop: '1px solid #1f1f1f',
           textAlign: 'center',
-          color: '#666',
+          color: '#777',
           fontSize: '0.85rem'
         }}>
-          Authorized email addresses only<br />
-          support@apexingoodcompany.co.uk<br />
-          business@apexingoodcompany.co.uk<br />
-          adam@apexingoodcompany.co.uk
+          If you are unable to login, please contact an administrator.
         </div>
       </div>
     </div>
