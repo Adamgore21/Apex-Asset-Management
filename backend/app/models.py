@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean, Enum, Date
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean, Enum, Date, event
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
+from .config import SUPER_USER_EMAIL
 import enum
 
 class AssetCondition(str, enum.Enum):
@@ -202,3 +203,20 @@ class AuditLog(Base):
     resource_name = Column(String)
     details = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+@event.listens_for(User, "before_update")
+def protect_super_admin_and_track_status(mapper, connection, target):
+    """Never allow the protected super-admin account to be disabled."""
+    if target.email and target.email.strip().lower() == SUPER_USER_EMAIL.lower():
+        target.is_active = True
+        target.disabled_at = None
+        target.disabled_reason = None
+        return
+
+    if target.is_active:
+        target.disabled_at = None
+        target.disabled_reason = None
+    elif target.disabled_at is None:
+        target.disabled_at = datetime.utcnow()
+        target.disabled_reason = "Manually disabled by an administrator"
