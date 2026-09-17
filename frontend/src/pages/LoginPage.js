@@ -100,7 +100,7 @@ function LoginPage({ onLoginSuccess, apiUrl }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="support@apexingoodcompany.co.uk"
+              placeholder="adam@apexingoodcompany.co.uk"
               required
               style={{
                 width: '100%',
@@ -173,7 +173,8 @@ function LoginPage({ onLoginSuccess, apiUrl }) {
         }}>
           Authorized email addresses only<br />
           support@apexingoodcompany.co.uk<br />
-          business@apexingoodcompany.co.uk
+          business@apexingoodcompany.co.uk<br />
+          adam@apexingoodcompany.co.uk
         </div>
       </div>
     </div>
