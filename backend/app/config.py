@@ -7,24 +7,24 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
 SUPER_USER_EMAIL = "support@apexingoodcompany.co.uk"
 INACTIVITY_AUTO_DISABLE_ENABLED = os.getenv("INACTIVITY_AUTO_DISABLE_ENABLED", "true").lower() == "true"
-INACTIVITY_DISABLE_DAYS = int(os.getenv("INACTIVITY_DISABLE_DAYS", "30"))
+INACTIVITY_DISABLE_DAYS = max(1, int(os.getenv("INACTIVITY_DISABLE_DAYS", "30")))
 DEFAULT_ASSET_LOCATION = os.getenv("DEFAULT_ASSET_LOCATION", "APEX HUB")
 
 
 class AuthorizedAdminList(list):
-    """Enforce active-user and inactivity rules through the existing login check."""
+    """Compatibility wrapper for the existing login authorization check.
+
+    Membership checks are deliberately read-only. Login timestamps are recorded
+    when an access token is actually issued, rather than when API requests occur.
+    """
 
     def __contains__(self, email):
         normalized = (email or "").strip().lower()
         configured = {str(item).strip().lower() for item in self}
 
         try:
-            from .database import SessionLocal, run_schema_migrations
+            from .database import SessionLocal
             from .models import User
-
-            # The application creates tables after importing its modules. Re-run the
-            # small migration here so fresh databases also get the SQLite trigger.
-            run_schema_migrations()
 
             db = SessionLocal()
             try:
@@ -42,15 +42,13 @@ class AuthorizedAdminList(list):
                     ):
                         user.is_active = False
                         user.disabled_at = datetime.utcnow()
-                        user.disabled_reason = f"Automatically disabled after {INACTIVITY_DISABLE_DAYS} days of inactivity"
+                        user.disabled_reason = (
+                            f"Automatically disabled after {INACTIVITY_DISABLE_DAYS} days of inactivity"
+                        )
                         db.commit()
                         return False
 
-                    user.last_login = datetime.utcnow()
-                    user.disabled_at = None
-                    user.disabled_reason = None
-                    db.commit()
-                    return normalized in configured or user.is_active
+                    return True
 
                 if normalized in configured:
                     role = "super_admin" if normalized == SUPER_USER_EMAIL.lower() else "admin"
@@ -64,7 +62,6 @@ class AuthorizedAdminList(list):
                         can_manage_maintenance=True,
                         can_view_audit_logs=(role == "super_admin"),
                         can_manage_users=(role == "super_admin"),
-                        last_login=datetime.utcnow(),
                     )
                     db.add(new_user)
                     db.commit()
@@ -74,6 +71,8 @@ class AuthorizedAdminList(list):
             finally:
                 db.close()
         except Exception:
+            # Keep the existing configured-email behaviour if the database is
+            # temporarily unavailable during application startup.
             return normalized in configured
 
 
