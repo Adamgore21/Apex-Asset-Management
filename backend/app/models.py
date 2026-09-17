@@ -179,6 +179,7 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
+    password_hash = Column(String, nullable=True)
     role = Column(String, default="admin")  # super_admin, admin, manager, viewer
     can_view_dashboard = Column(Boolean, default=True)
     can_manage_assets = Column(Boolean, default=True)
@@ -190,6 +191,19 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Invite(Base):
+    __tablename__ = "invites"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    token = Column(String, unique=True, index=True)  # Unique invite token
+    role = Column(String, default="admin")  # Role they'll get when accepting
+    invited_by = Column(String)  # Email of admin who invited
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime)  # Invite expiration (7 days)
+    accepted_at = Column(DateTime, nullable=True)  # When they accepted
+    is_used = Column(Boolean, default=False)  # Whether they've accepted
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"

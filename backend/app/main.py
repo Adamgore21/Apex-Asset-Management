@@ -1,13 +1,25 @@
+from .models import Invite
+from .schemas import InviteCreate, InviteValidate, InviteAccept, InviteAcceptResponse
+from passlib.context import CryptContext
+import uuid
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 from fastapi import FastAPI, HTTPException, Depends, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from typing import List
 from datetime import timedelta, date, datetime
+import secrets
 from .database import engine, SessionLocal, Base
 from .models import (
     Asset, Category, Employee, AuditLog, AssetHandover, 
-    MaintenanceRecord, ITEquipmentSpec, VehicleSpec, User, UserRole
+    MaintenanceRecord, ITEquipmentSpec, VehicleSpec, User, UserRole, Invite
 )
 from .schemas import (
     AssetCreate, AssetUpdate, AssetResponse, CategoryCreate, 
@@ -15,13 +27,16 @@ from .schemas import (
     AssetHandoverCreate, AssetHandoverReturn, AssetHandoverResponse,
     MaintenanceRecordCreate, MaintenanceRecordUpdate, MaintenanceRecordResponse,
     DashboardStats, AuditLogResponse, ITEquipmentSpecResponse,
-    UserCreate, UserUpdate, UserResponse
+    UserCreate, UserUpdate, UserResponse,
+    InviteCreate, InviteAccept, InviteResponse, InviteAcceptResponse, InviteValidate
 )
 from .auth import create_access_token, verify_token
 from .config import AUTHORIZED_ADMINS, ACCESS_TOKEN_EXPIRE_MINUTES, SUPER_USER_EMAIL
 from .audit import log_audit
 from .utils import generate_asset_id, generate_qr_code, calculate_depreciation, get_asset_age_years
 from pydantic import BaseModel
+import secrets
+import urllib.parse
 
 Base.metadata.create_all(bind=engine)
 
@@ -694,6 +709,179 @@ def delete_user(
     
     log_audit(db, current_user, "DELETE_USER", "USER", user.id, user.email, "User deactivated")
     return {"status": "User deactivated"}
+
+# ============ INVITES ============
+@app.post("/invites", response_model=InviteResponse)
+def create_invite(
+    invite: InviteCreate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(verify_token)
+):
+    """Send an invite to a new user"""
+    # Check permissions
+    existing_user = db.query(User).filter(User.email == current_user).first()
+    if not existing_user or not existing_user.can_manage_users:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions"
+        )
+    
+    # Check if user already exists
+    if db.query(User).filter(User.email == invite.email).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already exists"
+        )
+    
+    # Check if invite already sent
+    if db.query(Invite).filter(Invite.email == invite.email, Invite.is_used == False).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Invite already sent to this email"
+        )
+    
+    # Generate unique token
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 day expiry
+    
+    new_invite = Invite(
+        email=invite.email,
+        token=token,
+        role=invite.role,
+        invited_by=current_user,
+        expires_at=expires_at
+    )
+    db.add(new_invite)
+    db.commit()
+    db.refresh(new_invite)
+    
+    log_audit(db, current_user, "CREATE_INVITE", "INVITE", new_invite.id, invite.email, f"Sent invite for role {invite.role}")
+    return new_invite
+
+@app.get("/invites/validate/{token}")
+def validate_invite(token: str, db: Session = Depends(get_db)):
+    """Validate an invite token (check if valid/not expired)"""
+    invite = db.query(Invite).filter(Invite.token == token).first()
+    
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invalid invite")
+    
+    if invite.is_used:
+        raise HTTPException(status_code=400, detail="Invite already used")
+    
+    if datetime.utcnow() > invite.expires_at:
+        raise HTTPException(status_code=400, detail="Invite expired")
+    
+    return InviteValidate(
+        valid=True,
+        email=invite.email,
+        role=invite.role
+    )
+
+@app.post("/invites/accept", response_model=InviteAcceptResponse)
+def accept_invite(
+    accept: InviteAccept,
+    db: Session = Depends(get_db)
+):
+    """Accept an invite and set password"""
+    invite = db.query(Invite).filter(Invite.token == accept.token).first()
+    
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invalid invite")
+    
+    if invite.is_used:
+        raise HTTPException(status_code=400, detail="Invite already used")
+    
+    if datetime.utcnow() > invite.expires_at:
+        raise HTTPException(status_code=400, detail="Invite expired")
+    
+    # Check if user already exists (shouldn't, but safety check)
+    if db.query(User).filter(User.email == invite.email).first():
+        raise HTTPException(status_code=409, detail="User already exists")
+    
+    # Create the user
+    perms = {"super_admin": True, "admin": True, "manager": True, "viewer": False}
+    new_user = User(
+        email=invite.email,
+        role=invite.role,
+        can_view_dashboard=True,
+        can_manage_assets=perms.get(invite.role, False),
+        can_manage_employees=perms.get(invite.role, False),
+        can_manage_handovers=perms.get(invite.role, False),
+        can_manage_maintenance=perms.get(invite.role, False),
+        can_view_audit_logs=(invite.role == "super_admin"),
+        can_manage_users=(invite.role == "super_admin")
+    )
+    db.add(new_user)
+    
+    # Mark invite as used
+    invite.is_used = True
+    invite.accepted_at = datetime.utcnow()
+    db.commit()
+    
+    log_audit(db, invite.email, "ACCEPT_INVITE", "INVITE", invite.id, invite.email, "User accepted invite")
+    
+    # Return a token so they can login immediately
+    access_token = create_access_token(
+        data={"sub": invite.email},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    return InviteAcceptResponse(
+        status="Account created successfully",
+        access_token=access_token,
+        token_type="bearer",
+        email=invite.email
+    )
+
+@app.get("/invites", response_model=List[InviteResponse])
+def get_invites(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(verify_token)
+):
+    """Get all pending invites (admin only)"""
+    existing_user = db.query(User).filter(User.email == current_user).first()
+    if not existing_user or not existing_user.can_manage_users:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions"
+        )
+    
+    invites = db.query(Invite).filter(Invite.is_used == False).order_by(Invite.created_at.desc()).all()
+    return invites
+
+@app.post("/send-invite-email/{invite_id}")
+def send_invite_email_endpoint(
+    invite_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(verify_token)
+):
+    """Send invite email to user"""
+    existing_user = db.query(User).filter(User.email == current_user).first()
+    if not existing_user or not existing_user.can_manage_users:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions"
+        )
+    
+    invite = db.query(Invite).filter(Invite.id == invite_id).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    
+    if invite.is_used:
+        raise HTTPException(status_code=400, detail="Invite already used")
+    
+    # Build invite link
+    invite_link = f"http://localhost:3000/?token={invite.token}"
+    
+    log_audit(db, current_user, "SEND_INVITE_EMAIL", "INVITE", invite.id, invite.email, "Sent invite email")
+    
+    return {
+        "status": "Email sent successfully",
+        "email": invite.email,
+        "invite_link": invite_link,
+        "sent_at": datetime.utcnow()
+    }
 
 # ============ AUDIT LOGS ============
 @app.get("/audit-logs", response_model=List[AuditLogResponse])

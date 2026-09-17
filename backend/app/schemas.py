@@ -206,6 +206,39 @@ class DashboardStats(BaseModel):
     assets_missing: int
     recent_activities: List[dict]
 
+# Invites
+class InviteCreate(BaseModel):
+    email: str
+    role: str = "admin"
+
+class InviteAccept(BaseModel):
+    token: str
+    password: str
+
+class InviteValidate(BaseModel):
+    valid: bool
+    email: str
+    role: str
+
+class InviteAcceptResponse(BaseModel):
+    status: str
+    access_token: str
+    token_type: str
+    email: str
+
+class InviteResponse(BaseModel):
+    id: int
+    email: str
+    token: str
+    role: str
+    invited_by: str
+    created_at: datetime
+    expires_at: datetime
+    is_used: bool
+    
+    class Config:
+        from_attributes = True
+
 # Users
 class UserCreate(BaseModel):
     email: str

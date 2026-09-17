@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import SetupPassword from './pages/SetupPassword';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Assets from './pages/Assets';
@@ -45,6 +47,14 @@ function App() {
     setActiveTab('dashboard');
   };
 
+  // Check if this is a setup page (has token param)
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteToken = urlParams.get('token');
+  
+  if (inviteToken) {
+    return <SetupPassword apiUrl={API_URL} />;
+  }
+  
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} apiUrl={API_URL} />;
   }

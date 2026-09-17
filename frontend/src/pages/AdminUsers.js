@@ -3,6 +3,7 @@ import axios from 'axios';
 
 function AdminUsers({ apiUrl, token }) {
   const [users, setUsers] = useState([]);
+  const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -15,10 +16,10 @@ function AdminUsers({ apiUrl, token }) {
 
   useEffect(() => {
     fetchUsers();
+    fetchInvites();
   }, []);
 
   const fetchUsers = async () => {
-    setLoading(true);
     try {
       const response = await axios.get(`${apiUrl}/users`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -33,17 +34,48 @@ function AdminUsers({ apiUrl, token }) {
     }
   };
 
+  const fetchInvites = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/invites`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setInvites(response.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${apiUrl}/users`, formData, {
+      // Create invite
+      const inviteResponse = await axios.post(`${apiUrl}/invites`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setFormData({ email: '', role: 'admin' });
-      setShowForm(false);
-      fetchUsers();
+      
+      const inviteId = inviteResponse.data.id;
+      
+      // Send email with invite
+      try {
+        await axios.post(`${apiUrl}/send-invite-email/${inviteId}`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setError(`✅ Invite sent to ${formData.email}!`);
+      } catch (emailErr) {
+        // Email failed but invite was created
+        const inviteLink = `${window.location.origin}/?token=${inviteResponse.data.token}`;
+        setError(`⚠️ Invite created but email failed. Manual link: ${inviteLink}`);
+      }
+      
+      setTimeout(() => {
+        setFormData({ email: '', role: 'admin' });
+        setShowForm(false);
+        setError('');
+        fetchUsers();
+        fetchInvites();
+      }, 3000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create user');
+      setError(err.response?.data?.detail || 'Failed to create invite');
     }
   };
 
@@ -202,10 +234,70 @@ function AdminUsers({ apiUrl, token }) {
         </form>
       )}
 
+      {/* Pending Invites */}
+      {invites.length > 0 && (
+        <div style={{
+          background: '#0a0a0a',
+          border: '2px solid #f59e0b',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          marginBottom: '2rem'
+        }}>
+          <h2 style={{ margin: '0 0 1rem 0', color: '#f59e0b', fontSize: '1rem', fontWeight: '700' }}>📧 Pending Invites ({invites.length})</h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: '1rem'
+          }}>
+            {invites.map(invite => {
+              const expiresIn = Math.ceil((new Date(invite.expires_at) - new Date()) / (1000 * 60 * 60 * 24));
+              const inviteLink = `${window.location.origin}/?token=${invite.token}`;
+              return (
+                <div key={invite.id} style={{
+                  background: '#111111',
+                  border: '2px solid #f59e0b',
+                  borderRadius: '6px',
+                  padding: '1rem'
+                }}>
+                  <div style={{ color: '#f59e0b', fontWeight: '600', marginBottom: '0.5rem' }}>{invite.email}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#999', marginBottom: '0.75rem' }}>
+                    Role: <span style={{ color: '#ff5500' }}>{invite.role}</span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#999', marginBottom: '0.75rem' }}>
+                    Expires in: <span style={{ color: expiresIn <= 1 ? '#ef4444' : '#10b981' }}>{expiresIn}d</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(inviteLink);
+                      alert('Invite link copied!');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      background: '#1f1f1f',
+                      border: '1px solid #333',
+                      borderRadius: '4px',
+                      color: '#999',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = '#ff5500'}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = '#333'}
+                  >
+                    Copy Link
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
         {/* Users List */}
         <div>
-          <h2 style={{ margin: '0 0 1.5rem 0', color: '#ff5500', fontSize: '1.1rem', fontWeight: '700' }}>Users</h2>
+          <h2 style={{ margin: '0 0 1.5rem 0', color: '#ff5500', fontSize: '1.1rem', fontWeight: '700' }}>Active Users</h2>
           {loading ? (
             <div className="loading">Loading...</div>
           ) : (
