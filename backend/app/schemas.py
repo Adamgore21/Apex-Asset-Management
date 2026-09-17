@@ -48,7 +48,7 @@ class MaintenanceRecordResponse(BaseModel):
     class Config: from_attributes = True
 
 class DashboardStats(BaseModel):
-    total_assets: int; total_asset_value: float; book_value: float; assets_due_replacement: int; warranty_expiring_soon: int; assets_in_repair: int; assets_missing: int; recent_activities: List[dict]
+    total_assets: int; total_asset_value: float; book_value: float; assets_due_replacement: int; warranty_expiring_soon: int; assets_in_repair: int; assets_missing: int; apex_hub_assets: int = 0; apex_hub_value: float = 0; assigned_assets: int = 0; available_assets: int = 0; asset_health: dict = {}; recent_activities: List[dict]
 
 class InviteCreate(BaseModel): email: str; role: str = "admin"
 class InviteAccept(BaseModel): token: str; password: str
