@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timedelta
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-apex-asset-mgmt-2026")
 ALGORITHM = "HS256"
@@ -10,76 +9,13 @@ INACTIVITY_AUTO_DISABLE_ENABLED = os.getenv("INACTIVITY_AUTO_DISABLE_ENABLED", "
 INACTIVITY_DISABLE_DAYS = max(1, int(os.getenv("INACTIVITY_DISABLE_DAYS", "30")))
 DEFAULT_ASSET_LOCATION = os.getenv("DEFAULT_ASSET_LOCATION", "APEX HUB")
 
-
-class AuthorizedAdminList(list):
-    """Compatibility wrapper for the existing login authorization check.
-
-    Membership checks are deliberately read-only. Login timestamps are recorded
-    when an access token is actually issued, rather than when API requests occur.
-    """
-
-    def __contains__(self, email):
-        normalized = (email or "").strip().lower()
-        configured = {str(item).strip().lower() for item in self}
-
-        try:
-            from .database import SessionLocal
-            from .models import User
-
-            db = SessionLocal()
-            try:
-                user = db.query(User).filter(User.email == normalized).first()
-
-                if user:
-                    if not user.is_active:
-                        return False
-
-                    if (
-                        INACTIVITY_AUTO_DISABLE_ENABLED
-                        and normalized != SUPER_USER_EMAIL.lower()
-                        and user.last_login is not None
-                        and datetime.utcnow() - user.last_login >= timedelta(days=INACTIVITY_DISABLE_DAYS)
-                    ):
-                        user.is_active = False
-                        user.disabled_at = datetime.utcnow()
-                        user.disabled_reason = (
-                            f"Automatically disabled after {INACTIVITY_DISABLE_DAYS} days of inactivity"
-                        )
-                        db.commit()
-                        return False
-
-                    return True
-
-                if normalized in configured:
-                    role = "super_admin" if normalized == SUPER_USER_EMAIL.lower() else "admin"
-                    new_user = User(
-                        email=normalized,
-                        role=role,
-                        can_view_dashboard=True,
-                        can_manage_assets=True,
-                        can_manage_employees=True,
-                        can_manage_handovers=True,
-                        can_manage_maintenance=True,
-                        can_view_audit_logs=(role == "super_admin"),
-                        can_manage_users=(role == "super_admin"),
-                    )
-                    db.add(new_user)
-                    db.commit()
-                    return True
-
-                return False
-            finally:
-                db.close()
-        except Exception:
-            # Keep the existing configured-email behaviour if the database is
-            # temporarily unavailable during application startup.
-            return normalized in configured
-
-
-AUTHORIZED_ADMINS = AuthorizedAdminList([
+# These addresses are the backend-authorised administrator accounts.
+# Keep this list independent of the database so login cannot fail because
+# of a database migration/startup issue.
+AUTHORIZED_ADMINS = [
     "support@apexingoodcompany.co.uk",
     "business@apexingoodcompany.co.uk",
     "adam@apexingoodcompany.co.uk",
-])
+]
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./assets.db")
