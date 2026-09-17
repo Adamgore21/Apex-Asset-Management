@@ -12,7 +12,7 @@ DEFAULT_ASSET_LOCATION = os.getenv("DEFAULT_ASSET_LOCATION", "APEX HUB")
 
 
 class AuthorizedAdminList(list):
-    """Keeps the legacy authorized-email check while enforcing user lifecycle rules."""
+    """Enforce active-user and inactivity rules through the existing login check."""
 
     def __contains__(self, email):
         normalized = (email or "").strip().lower()
@@ -26,7 +26,6 @@ class AuthorizedAdminList(list):
             try:
                 user = db.query(User).filter(User.email == normalized).first()
 
-                # Existing accounts are always subject to active/inactivity checks.
                 if user:
                     if not user.is_active:
                         return False
@@ -49,13 +48,28 @@ class AuthorizedAdminList(list):
                     db.commit()
                     return normalized in configured or user.is_active
 
-                # Configured bootstrap admins are allowed to log in; their User record
-                # will be created by the startup/bootstrap process when applicable.
-                return normalized in configured
+                if normalized in configured:
+                    role = "super_admin" if normalized == SUPER_USER_EMAIL.lower() else "admin"
+                    new_user = User(
+                        email=normalized,
+                        role=role,
+                        can_view_dashboard=True,
+                        can_manage_assets=True,
+                        can_manage_employees=True,
+                        can_manage_handovers=True,
+                        can_manage_maintenance=True,
+                        can_view_audit_logs=(role == "super_admin"),
+                        can_manage_users=(role == "super_admin"),
+                        last_login=datetime.utcnow(),
+                    )
+                    db.add(new_user)
+                    db.commit()
+                    return True
+
+                return False
             finally:
                 db.close()
         except Exception:
-            # Preserve the existing behaviour if the database is temporarily unavailable.
             return normalized in configured
 
 
